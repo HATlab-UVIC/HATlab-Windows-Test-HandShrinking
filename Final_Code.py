@@ -14,7 +14,6 @@ lower = np.array([0, 48, 80], dtype="uint8")
 upper = np.array([20, 255, 255], dtype="uint8")
 
 BigMargin = 50
-SmallMargin = 20
 
 frame_width = int(cap.get(3))
 frame_height = int(cap.get(4))
@@ -36,13 +35,6 @@ def scale_contour(cnt, scale):
 
     return cnt_scaled
 
-# def scale_img(img, cnt, scale):
-#     M = cv2.moments(cnt)
-#     cx = int(M['m10'] / M['m00'])
-#     cy = int(M['m01'] / M['m00'])
-#
-#     cnt_norm = cnt - [cx, ]
-
 
 
 while True:
@@ -50,7 +42,6 @@ while True:
 
     if (ret is True):
 
-        # frame = cv2.resize(frame, None, fx = 0.5, fy = 0.5)
         frame = cv2.resize(frame, ((int)(frame.shape[1]), (int)(frame.shape[0])), fx = 0.5, fy = 0.5)
 
         frame_copy = frame.copy()
@@ -61,7 +52,6 @@ while True:
 
         landmarks = fl.get_hands_landmarks(frame)
 
-        # print(len(landmarks))
         if (len(landmarks) > 0):
             pt = landmarks[0]
 
@@ -80,13 +70,7 @@ while True:
         if (len(landmarks) > 0):
             # cv2.fillConvexPoly(mask, convexhull, 255)
             boundingPointsWithBigMargin = np.array([[boundingRect[0] - BigMargin, boundingRect[3] + boundingRect[1] + BigMargin], [boundingRect[0] - BigMargin, boundingRect[1] - BigMargin], [boundingRect[0] + boundingRect[2] + BigMargin, boundingRect[1] - BigMargin], [boundingRect[0] + boundingRect[2] + BigMargin, boundingRect[3] + boundingRect[1] + BigMargin]], dtype=np.int32)
-            boundingPointsWithSmallMargin = np.array([[boundingRect[0] - SmallMargin, boundingRect[3] + boundingRect[1] + SmallMargin], [boundingRect[0] - SmallMargin, boundingRect[1] - SmallMargin], [boundingRect[0] + boundingRect[2] + SmallMargin, boundingRect[1] - SmallMargin], [boundingRect[0] + boundingRect[2] + SmallMargin, boundingRect[3] + boundingRect[1] + SmallMargin]], dtype=np.int32)
             cv2.fillPoly(mask, [boundingPointsWithBigMargin], 255)
-            cv2.fillPoly(SmallMask, [boundingPointsWithSmallMargin], 255)
-
-
-            # cv2.fillPoly(mask, [cv2.typing.Point2f(boundingRect[0], boundingRect[1]), cv2.typing.Point2f(boundingRect[2], boundingRect[3])], 255)
-            # cv2.fillPoly(mask, np.int8(np.array([[boundingRect[0], boundingRect[1]], [boundingRect[2], boundingRect[3]]])), 255)
 
             hand_extracted = cv2.bitwise_and(frame_copy, frame_copy, mask = mask)
 
@@ -96,6 +80,7 @@ while True:
 
             # define the upper and lower boundaries of the HSV pixel intensities
             # to be considered 'skin'
+            # todo:update HSV value from mediapipe hand landmarks
             hsvim = cv2.cvtColor(hand_extracted, cv2.COLOR_BGR2HSV)
 
             skinMask = cv2.inRange(hsvim, lower, upper)
@@ -109,6 +94,7 @@ while True:
 
             ##threshold = cv2.adaptiveThreshold(hand_extracted, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 33, 1)
             # threshold = cv2.bitwise_and(threshold, threshold, mask=mask)
+
             _, threshold = cv2.threshold(hand_extracted, 200, 255, cv2.THRESH_BINARY)
 
 
@@ -118,7 +104,6 @@ while True:
             contour_hand, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             max_contour_hand = max(contour_hand, key=lambda x: cv2.contourArea(x))
             max_contour_hand_scaled = scale_contour(max_contour_hand, 1.4)
-            # max_contour_hand = max(contour_hand, key=cv2.contourArea)
             hand_extracted = cv2.cvtColor(hand_extracted, cv2.COLOR_GRAY2RGB)
 
             # i = 0
@@ -130,7 +115,6 @@ while True:
             #     # filled_hand_contour = cv2.drawContours(hand_extracted, [contour], 0, (255, 255,255), -1)
             #     hand_extracted = cv2.drawContours(hand_extracted, [contour], 0, (0, 255, 0), -1)
 
-            # hand_extracted = cv2.drawContours(hand_extracted, [max_contour_hand], -1, (255, 255, 255), -1)
             hand_contour_mask_scaled = cv2.drawContours(hand_contour_mask, [max_contour_hand_scaled], 0, (255, 255, 255), -1)
             hand_contour_mask = np.zeros((height, width), np.uint8)
             hand_contour_mask = cv2.drawContours(hand_contour_mask, [max_contour_hand], 0, (255, 255, 255), -1)
@@ -144,7 +128,6 @@ while True:
             # blurred_hand = cv2.medianBlur(hand_masked_scaled, 19)
             blurred_hand = cv2.bitwise_and(blurred_hand, blurred_hand, mask = hand_contour_mask)
 
-            # hand_masked = scale_image(hand_masked, 0.7)
 
 
         # Extract the Back Ground
@@ -163,18 +146,11 @@ while True:
 
         video_output.write(result)
         cv2.imshow("Final Result", result)
-        cv2.imshow("Final Result Scaled", background)
-
         #cv2.imshow("Background", background)
-
-
         #cv2.imshow("Mask Inverse", background_mask)
         #cv2.imshow("Blurred Face", blurred_hand)
-
         cv2.imshow("Frame", frame)
-
         #cv2.imshow("Face Extracted", hand_extracted)
-
         #cv2.imshow("Mask", mask)
     else:
         break
