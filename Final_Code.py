@@ -7,7 +7,8 @@ import numpy as np
 from hand_landmarks import HandsLandmarks
 
 fl = HandsLandmarks()
-cap = cv2.VideoCapture("Captured_video.mp4v")
+# cap = cv2.VideoCapture("Captured_video.mp4v")
+cap = cv2.VideoCapture(0)
 
 lower = np.array([0, 48, 80], dtype="uint8")
 upper = np.array([20, 255, 255], dtype="uint8")
@@ -34,6 +35,13 @@ def scale_contour(cnt, scale):
     cnt_scaled = cnt_scaled.astype(np.int32)
 
     return cnt_scaled
+
+# def scale_img(img, cnt, scale):
+#     M = cv2.moments(cnt)
+#     cx = int(M['m10'] / M['m00'])
+#     cy = int(M['m01'] / M['m00'])
+#
+#     cnt_norm = cnt - [cx, ]
 
 
 
@@ -109,7 +117,7 @@ while True:
 
             contour_hand, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             max_contour_hand = max(contour_hand, key=lambda x: cv2.contourArea(x))
-            max_contour_hand_scaled = scale_contour(max_contour_hand, 1.3)
+            max_contour_hand_scaled = scale_contour(max_contour_hand, 1.4)
             # max_contour_hand = max(contour_hand, key=cv2.contourArea)
             hand_extracted = cv2.cvtColor(hand_extracted, cv2.COLOR_GRAY2RGB)
 
@@ -124,12 +132,17 @@ while True:
 
             # hand_extracted = cv2.drawContours(hand_extracted, [max_contour_hand], -1, (255, 255, 255), -1)
             hand_contour_mask_scaled = cv2.drawContours(hand_contour_mask, [max_contour_hand_scaled], 0, (255, 255, 255), -1)
+            hand_contour_mask = np.zeros((height, width), np.uint8)
             hand_contour_mask = cv2.drawContours(hand_contour_mask, [max_contour_hand], 0, (255, 255, 255), -1)
+            hand_contour_mask_scaled = cv2.add(hand_contour_mask_scaled, hand_contour_mask)
 
-            hand_masked = cv2.bitwise_and(frame_copy, frame_copy, mask = hand_contour_mask_scaled)
+            hand_masked_scaled = cv2.bitwise_and(frame_copy, frame_copy, mask = hand_contour_mask_scaled)
+            hand_masked = cv2.bitwise_and(frame_copy, frame_copy, mask = hand_contour_mask)
 
             # blurred_hand = cv2.GaussianBlur(hand_contour_mask, (27, 27), 0)
-            blurred_hand = cv2.GaussianBlur(hand_masked, (27, 27), 1, 1, 1, borderType=cv2.BORDER_REPLICATE)
+            blurred_hand = cv2.GaussianBlur(hand_masked_scaled, (33,33), 7, 1, 7, borderType=cv2.BORDER_REFLECT)
+            # blurred_hand = cv2.medianBlur(hand_masked_scaled, 19)
+            blurred_hand = cv2.bitwise_and(blurred_hand, blurred_hand, mask = hand_contour_mask)
 
             # hand_masked = scale_image(hand_masked, 0.7)
 
@@ -144,12 +157,13 @@ while True:
 
         # result = cv2.add(background, hand_extracted)
         result = cv2.add(background, blurred_hand)
-        # result = background
+        # result = blurred_hand
         # result = hand_extracted
         # result = cv2.add(background, hand_contour_mask)
 
         video_output.write(result)
         cv2.imshow("Final Result", result)
+        cv2.imshow("Final Result Scaled", background)
 
         #cv2.imshow("Background", background)
 
