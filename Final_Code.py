@@ -55,20 +55,20 @@ while True:
 
         landmarks = fl.get_hands_landmarks(frame)
 
+        # Check hand is being detected
         if (len(landmarks) > 0):
             pt = landmarks[0]
-
             convexhull = cv2.convexHull(landmarks)
             boundingRect = cv2.boundingRect(landmarks)
 
-
+        # Create masks
         mask = np.zeros((height, width), np.uint8)
         #SmallMask = np.zeros((height, width), np.uint8)
-
         hand_contour_mask = np.zeros((height, width), np.uint8)
 
         #cv2.polylines(frame, [convexhull], True, (0, 255, 0), 3)
 
+        # Cehck if hand is being tracked
         if (len(landmarks) > 0):
             # cv2.fillConvexPoly(mask, convexhull, 255)
             boundingPointsWithBigMargin = np.array([[boundingRect[0] - BigMargin, boundingRect[3] + boundingRect[1] + BigMargin], [boundingRect[0] - BigMargin, boundingRect[1] - BigMargin], [boundingRect[0] + boundingRect[2] + BigMargin, boundingRect[1] - BigMargin], [boundingRect[0] + boundingRect[2] + BigMargin, boundingRect[3] + boundingRect[1] + BigMargin]], dtype=np.int32)
@@ -76,45 +76,27 @@ while True:
 
             hand_extracted = cv2.bitwise_and(frame_copy, frame_copy, mask=mask)
 
-            # Blurring the Hand
-
-            # blurred_hand = cv2.GaussianBlur(hand_extracted, (27, 27), 0)
-
-            # define the upper and lower boundaries of the HSV pixel intensities
-            # to be considered 'skin'
-            # todo:update HSV value from mediapipe hand landmarks
+            # Process image before defining skin HSV value
             hand_extracted_gray = cv2.cvtColor(hand_extracted, cv2.COLOR_BGR2GRAY)
-            hand_extracted_edges = cv2.Canny(hand_extracted_gray, 80, 200)
+            hand_extracted_edges = cv2.Canny(hand_extracted_gray, 60, 200)
             hand_extracted_blurred = cv2.GaussianBlur(hand_extracted_edges, (9, 9), 0)
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
             hand_extracted_gray = clahe.apply(hand_extracted_blurred)
+            hand_extracted = cv2.cvtColor(hand_extracted_gray, cv2.COLOR_GRAY2BGR)
             hsvim = cv2.cvtColor(hand_extracted, cv2.COLOR_BGR2HSV)
 
-            # landmarks[:, [1,0]]
-            #print(landmarks)
-            # landmarks = np.array([frame_width - landmarks[:, ::-1][:, [0]], frame_height - landmarks[:, ::-1][:, [1]]])
-            landmarks = np.array([[min(frame_height - 1, landmarks[i, 1]), min(frame_width - 1, landmarks[i, 0])] for i in range(landmarks.shape[0])])
-            # landmarks = np.array([[max(frame_height - 1, landmarks[i, 1]), max(frame_width - 1, landmarks[i, 0])] for i in range(landmarks.shape[0])])
-            # print( np.array([[landmarks[i, 1], landmarks[i, 0]] for i in range(landmarks.shape[0])]))
-            # print(landmarks)
-            # Assuming that landmarks are configured as y, x
-            # hsvFromHand = hsvim[landmarks[[0][0][1]], landmarks[[0][0][0]]]
-            # hsvFromHand = hsvim[landmarks[:, [1][0]], landmarks[:, [0][0]]]
-            # print(hsvim.shape)
-            # hsvFromHand = hsvim[landmarks[:]]
-            hsvFromHand = hsvim[landmarks[:, [0]], landmarks[:, [1]]]
-            # print(hsvFromHand)
-            #print(landmarks[0][0])
-            # print(landmarks[:, [1][0]])
-            # print(landmarks[:, [0][0]], landmarks[:, [1][0]])
-            # print(frame_width, frame_height)
-            #print(frame.shape)
-            # print(hsvFromHand)
-            hsvFromHandMean = np.array([np.mean(hsvFromHand[:, :, [0]]), np.mean(hsvFromHand[:, :, [1]]), np.mean(hsvFromHand[:, :, [2]])])
-            print(hsvFromHandMean)
 
-            # lower = np.array([max(hsvFromHandMean[0] - 10, 0), max(hsvFromHand[1] - 50, 45), max(hsvFromHand[2] - 50, 80)], dtype="uint8")
-            # upper = np.array([min(hsvFromHandMean[0] + 10, 179), min(hsvFromHand[1] - 50, 255), min(hsvFromHand[2] + 50, 255)], dtype="uint8")
+            # Calculate mean HSV value of hand
+            landmarks = np.array([[min(frame_height - 1, landmarks[i, 1]), min(frame_width - 1, landmarks[i, 0])] for i in range(landmarks.shape[0])])
+            hsvFromHand = hsvim[landmarks[:, [0]], landmarks[:, [1]]]
+            hsvFromHandMean = np.array([np.mean(hsvFromHand[:, :, [0]]), np.mean(hsvFromHand[:, :, [1]]), np.mean(hsvFromHand[:, :, [2]])])
+
+            # define the upper and lower boundaries of the HSV pixel intensities to be considered 'skin'
+            HueMean = hsvFromHandMean[0]
+            SaturationMean = hsvFromHandMean[1]
+            ValueMean = hsvFromHandMean[2]
+            lower = np.array([max(HueMean - 10, 0), max(SaturationMean - 30, 45), max(ValueMean - 50, 80)], dtype="uint8")
+            upper = np.array([min(HueMean + 10, 179), min(SaturationMean + 30, 255), min(ValueMean + 50, 255)], dtype="uint8")
 
             skinMask = cv2.inRange(hsvim, lower, upper)
 
@@ -132,12 +114,12 @@ while True:
 
 
             # get threshold image
-            ret, thresh = cv2.threshold(skinMask, 150, 255, cv2.THRESH_BINARY)
-
+            # ret, thresh = cv2.threshold(skinMask, 150, 255, cv2.THRESH_BINARY)
+            #
             # contour_hand, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             # max_contour_hand = max(contour_hand, key=lambda x: cv2.contourArea(x))
             # max_contour_hand_scaled = scale_contour(max_contour_hand, 1.4)
-            # hand_extracted = cv2.cvtColor(hand_extracted, cv2.COLOR_GRAY2RGB)
+            # # hand_extracted = cv2.cvtColor(hand_extracted, cv2.COLOR_GRAY2BGR)
             #
             # # i = 0
             # # for contour in contour_hand:
@@ -173,7 +155,7 @@ while True:
 
         # result = cv2.add(background, hand_extracted)
         # result = cv2.add(background, blurred_hand)
-        result = hsvim
+        result = hand_extracted
 
         # result = hand_extracted
         # result = cv2.add(background, hand_contour_mask)
